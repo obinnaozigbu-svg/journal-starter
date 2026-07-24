@@ -1,7 +1,10 @@
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
+
+Field_val = Annotated[str, StringConstraints(strip_whitespace=True, max_length=256, min_length=1)]
 
 
 class AnalysisResponse(BaseModel):
@@ -29,21 +32,11 @@ class EntryCreate(BaseModel):
     See https://docs.pydantic.dev/latest/concepts/types/#constrained-types
     """
 
-    work: str = Field(
-        max_length=256,
-        description="What did you work on today?",
-        json_schema_extra={"example": "Studied FastAPI and built my first API endpoints"},
-    )
-    struggle: str = Field(
-        max_length=256,
-        description="What's one thing you struggled with today?",
-        json_schema_extra={"example": "Understanding async/await syntax and when to use it"},
-    )
-    intention: str = Field(
-        max_length=256,
-        description="What will you study/work on tomorrow?",
-        json_schema_extra={"example": "Practice PostgreSQL queries and database design"},
-    )
+    work: Field_val
+
+    struggle: Field_val
+
+    intention: Field_val
 
 
 # TODO (Task 3): Define an ``EntryUpdate`` model for PATCH /entries/{entry_id}.
@@ -55,6 +48,14 @@ class EntryCreate(BaseModel):
 #
 # Once defined, import ``EntryUpdate`` in ``api/routers/journal_router.py``
 # and use it as the type of the PATCH endpoint's request body.
+
+
+class EntryUpdate(BaseModel):
+    work: Field_val | None = None
+
+    struggle: Field_val | None = None
+
+    intention: Field_val | None = None
 
 
 class Entry(BaseModel):
