@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.config import Settings, get_settings
-from api.models.entry import AnalysisResponse, Entry, EntryCreate
+from api.models.entry import AnalysisResponse, Entry, EntryCreate, EntryUpdate
 from api.repositories.postgres_repository import PostgresDB
 from api.services.entry_service import EntryService
 from api.services.llm_service import analyze_journal_entry
@@ -66,12 +66,18 @@ async def get_entry(entry_id: str, entry_service: EntryService = Depends(get_ent
 
     Hint: Check the update_entry endpoint for similar patterns
     """
-    raise HTTPException(status_code=501, detail="Not implemented - complete this endpoint!")
+    result = await entry_service.get_entry(entry_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    return result
 
 
 @router.patch("/entries/{entry_id}")
 async def update_entry(
-    entry_id: str, entry_update: dict, entry_service: EntryService = Depends(get_entry_service)
+    entry_id: str,
+    entry_update: EntryUpdate,
+    entry_service: EntryService = Depends(get_entry_service),
 ):
     """Update a journal entry.
 
@@ -81,7 +87,7 @@ async def update_entry(
     empty strings and 300-character bodies — see ``TestUpdateEntry`` in
     tests/test_api.py.
     """
-    result = await entry_service.update_entry(entry_id, entry_update)
+    result = await entry_service.update_entry(entry_id, entry_update.model_dump(exclude_unset=True))
     if not result:
         raise HTTPException(status_code=404, detail="Entry not found")
 
@@ -106,7 +112,13 @@ async def delete_entry(entry_id: str, entry_service: EntryService = Depends(get_
 
     Hint: Look at how the update_entry endpoint checks for existence
     """
-    raise HTTPException(status_code=501, detail="Not implemented - complete this endpoint!")
+    result = await entry_service.get_entry(entry_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    await entry_service.delete_entry(entry_id)
+
+    return {"detail": "Entry deleted successfully"}
 
 
 @router.delete("/entries")
