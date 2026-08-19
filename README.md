@@ -32,6 +32,7 @@ PRs opened against `learntocloud/journal-starter` will be closed without review.
 - [What To Do If the Upstream Repo Has Changed](#-what-to-do-if-the-upstream-repo-has-changed)
 - [Extras](#-extras)
 - [License](#-license)
+- [My Architecture](#-journal-api-infrastructure)
 
 ## 🚀 Getting Started
 
@@ -588,5 +589,44 @@ This is how open-source contributors keep their fork up to date. It's more invol
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
 Contributions welcome! [Open an issue](https://github.com/learntocloud/journal-starter/issues) to get started.
+<br />
+<br />
+<br />
+## Journal API Infrastructure
+
+This section contains information on the infrastructure I built on AWS.
+
+![Infrastructure Diagram](/Cloud-phase-capstone-diagram.drawio.png)
+
+### Overview
+I built a three-tier API architecture on AWS with a bastion host for admin access, deployed via the CLI. It has a public facing Application Load Balancer which routes traffic to the private API server which connects to the private database server. The private API and database servers are unreachable from the public internet.
+
+### Architecture
+**Networking**<br />
+The VPC spans two availability zones with public and private subnets in each, since AWS requires that ALBs have public subnets in at least two availability zones (AZs). For this capstone project, I kept both the API and DB EC2 instances in one availability zone, rather than one per AZ for the sake of simplicity while meeting the ALB's subnet requirement. Public subnets route outbound traffic through the internet gateway; private subnets route outbound traffic through a NAT gateway on the public subnet. Hence, the private instances can reach the internet without being accessible from it.
+
+**Traffic flow**<br />
+Requests hit the ALB over HTTPS (TLS terminates there with a trusted ACM certificate), and HTTP traffic is redirected to HTTPS. The ALB forwards requests to the API private server which talks to the private DB server. Both servers are in separate private subnets
+
+**Access Control**<br />
+The bastion is the only entry point for SSH access to the API and DB servers. The domain is managed through Route53 with a public hosted zone for internet-facing records and a private hosted zone for internal resolution.
+
+**LLM Choice**<br />
+The LLM chosen for this project is OpenAI's gpt-oss-120b from Groq. Groq's current pricing for this model is $0.15 input / $0.60 output per 1M tokens.
+
+### Limitations & Production Considerations
+
+This was built as a learning project, so a few things were simplified or left as known gaps rather than solved:
+
+**No use of Amazon Bedrock Models**<br />
+There were issues in trying to invoke bedrock models despite satisfying the requirement and attaching the required policies to the IAM user. A support case was created but still unassigned and waiting for a response on the matter. Hence, a model from another provider (Groq) was used.
+
+**Secrets management**<br />
+The Groq API key is currently stored as a plaintext value in a local `.env` file, loaded at runtime via environment variables. This is fine for local development but isn't suitable for production. A production deployment should pull secrets from a dedicated secrets manager (e.g. AWS Secrets Manager or SSM Parameter Store) with IAM-scoped access, rather than files on disk.
+
+**No content moderation layer**<br />
+LLM calls for entry analysis rely on the model's own built-in safety training, with no dedicated moderation step in front of or behind the call. Lower risk here since the model only processes the user's own journal entries rather than arbitrary public input, but it's a gap worth naming.
+
+**Infrastructure status**<br />
+The public hosted zone and ACM certificate shown in the diagram were torn down after the project wrapped up, to avoid ongoing cost. The architecture above reflects what was built and tested, not a currently live endpoint.
