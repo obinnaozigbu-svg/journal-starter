@@ -32,7 +32,7 @@ PRs opened against `learntocloud/journal-starter` will be closed without review.
 - [What To Do If the Upstream Repo Has Changed](#-what-to-do-if-the-upstream-repo-has-changed)
 - [Extras](#-extras)
 - [License](#-license)
-- [My Architecture](#-journal-api-infrastructure)
+- [My Architecture](#journal-api-infrastructure)
 
 ## 🚀 Getting Started
 
