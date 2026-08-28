@@ -9,25 +9,25 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
-      with:
-        version: "latest"
-    
-    - name: Set up Python
-      run: uv python install 3.11
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        run: uv python install 3.11
 
-    - name: Install dependencies
-      run: uv sync
+      - name: Install dependencies
+        run: uv sync
 
-    - name: Lint with ruff
-      run: uv run ruff check .
+      - name: Lint with ruff
+        run: uv run ruff check .
 
-    - name: Type check with pyright
-      run: uv run pyright
+      - name: Type check with pyright
+        run: uv run pyright
 
-    - name: Run tests
-      run: uv run pytest
+      - name: Run tests
+        run: uv run pytest
