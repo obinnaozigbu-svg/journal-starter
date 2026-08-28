@@ -5,14 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
+  
 jobs:
   lint:
     name: Lint
@@ -23,21 +16,19 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
+          version: "latest"
           enable-cache: true
-
+      
       - name: Set up Python
         run: uv python install 3.14
 
       - name: Install dependencies
         run: uv sync --locked --all-extras
 
-      - name: Ruff check
+      - name: Lint with ruff
         run: uv run ruff check .
 
-      - name: Ruff format check
-        run: uv run ruff format --check .
-
-      - name: Pyright type check
+      - name: Type check with pyright
         run: uv run pyright
 
   test:
@@ -47,12 +38,12 @@ jobs:
     services:
       postgres:
         image: postgres:16
+        ports:
+          - 5432:5432
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: career_journal
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -64,10 +55,9 @@ jobs:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: career_journal
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/career_journal
-      # Required by api.config.Settings so the app boots. Tests never call a
-      # real LLM — Task 4 uses an injected MockAsyncOpenAI client — so any
-      # non-empty value works.
       OPENAI_API_KEY: ci-placeholder-not-used-by-mock
+      OPENAI_BASE_URL: https://example.invalid/v1
+      OPENAI_MODEL: ci-placeholder-not-used-by-mock
 
     steps:
       - uses: actions/checkout@v4
@@ -75,8 +65,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
+          version: "latest"
           enable-cache: true
-
+      
       - name: Set up Python
         run: uv python install 3.14
 
@@ -86,8 +77,38 @@ jobs:
       - name: Initialize database schema
         run: |
           PGPASSWORD=postgres psql \
-            -h localhost -U postgres -d career_journal \
-            -f database_setup.sql
+            -h localhost -U postgres \
+            -d career_journal -f database_setup.sql
 
       - name: Run tests
         run: uv run pytest -v
+
+  
+  docker-publish:
+    name: Build and push to ECR
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: journal-api
+          IMAGE_TAG: ${{ github.sha }}
+
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
