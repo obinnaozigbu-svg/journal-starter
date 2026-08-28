@@ -7,15 +7,17 @@ on:
     branches: [main]
   
 jobs:
-  build-and-test:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v6
         with:
           version: "latest"
+          enable-cache: true
       
       - name: Set up Python
         run: uv python install 3.11
@@ -23,14 +25,61 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --all-extras
 
-      - name: Create .env file
-        run: cp .env-sample .env
-
       - name: Lint with ruff
         run: uv run ruff check .
 
       - name: Type check with pyright
         run: uv run pyright
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: career_journal
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: career_journal
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/career_journal
+      OPENAI_API_KEY: ci-placeholder-not-used-by-mock
+      OPENAI_BASE_URL: https://example.invalid/v1
+      OPENAI_MODEL: ci-placeholder-not-used-by-mock
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+          enable-cache: true
+      
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Initialize database schema
+        run: |
+          PGPASSWORD=postgres psql \
+            -h localhost -U postgres \
+            -d career_journal -f database_setup.sql
+
       - name: Run tests
-        run: uv run pytest
+        run: uv run pytest -v
+    
