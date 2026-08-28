@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --all-extras
 
+      - name: Create .env file
+        run: cp .env-sample .env
+
       - name: Lint with ruff
         run: uv run ruff check .
 
